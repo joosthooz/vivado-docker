@@ -68,12 +68,12 @@ To override the entrypoint, you need to use the ```--entrypoint``` option. You m
 docker run --rm -it -e DISPLAY=$IP:0 -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint /bin/bash gitlab-registry.cern.ch/aperloff/vivado-docker/<container name>:<container tag>
 ```
 
-### vivado_docker Bash Function
-Inside the file ```.vivado_docker``` there is a bash function named vivado_docker. This function is meant to help the user quickly spin up a one of these docker containers. Rather than having to remember the entire docker run command and the variations for each entrypoint, this function provides a much simpler interface. It is based on the "Direct Connection" method mentioned above. I find it useful to source the ```.vivado_docker``` file from within my login script.
+### xilinx_docker Bash Function
+Inside the file ```.xilinx_docker``` there is a bash function named xilinx_docker. This function is meant to help the user quickly spin up a one of these docker containers. Rather than having to remember the entire docker run command and the variations for each entrypoint, this function provides a much simpler interface. It is based on the "Direct Connection" method mentioned above. I find it useful to source the ```.xilinx_docker``` file from within my login script.
 
 For a complete set of directions on how to use this utility, see the functions help message. Simply use:
 ```bash
-vivado_docker -h
+xilinx_docker -h
 ```
 
 ## Run Using VNC
