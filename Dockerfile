@@ -1,8 +1,7 @@
-FROM sl:7
+FROM centos:centos7.7.1908
 
 COPY files/install_config.txt /opt/install_config.txt
 COPY files/install.sh /opt/install.sh
-COPY files/setup_ivarch.txt /opt/setup_ivarch.txt
 
 ARG VERSION=2019.2
 ARG INSTALLER_NAME=Xilinx_Vivado_2019.2_1106_2127
@@ -65,9 +64,7 @@ ARG REFERENCE_SPLIT_MD5SUM_LIST="f611d6fc1f45911e5667f759089fcf3f;\
                                  005aaa902ceba12b82e9ac7499cfe63a;\
                                  32cc297b01b41e3e08fd900538925b51"
 
-RUN cat /opt/setup_ivarch.txt >> /etc/yum.conf \
-    && rpm --import http://www.ivarch.com/personal/public-key.txt \
-    && yum -y install gcc gcc-c++ make java-1.8.0-openjdk libXrender-devel libXtst-devel xorg-x11-server-Xorg xorg-x11-xauth xorg-x11-apps pv wget \
+RUN yum -y install gcc gcc-c++ make java-1.8.0-openjdk libXrender-devel libXtst-devel xorg-x11-server-Xorg xorg-x11-xauth xorg-x11-apps wget \
     && yum clean all \
     && df -ih \
     && mkdir -p /opt \
@@ -101,7 +98,7 @@ RUN cat /opt/setup_ivarch.txt >> /etc/yum.conf \
     && checksum=$(echo $(md5sum ${TARBALL_PATH}) | awk '{print $1;}') \
     && [[ "${checksum}" == "${REFERENCE_MD5SUM}" ]] && echo 'Checksums match!' || echo "WARNING::The checksums of the original tarball and the merged tarball don't match!" \
     && echo "Unpacking the tarball ..." \
-    && pv ${TARBALL_PATH} | tar -xzf - --directory /opt/ \
+    && tar --directory /opt/ -xzf ${TARBALL_PATH} \
     && ls -alh /opt \
     && df -ih \
     && echo "Removing the tarball ..." \
@@ -124,11 +121,109 @@ RUN cat /opt/setup_ivarch.txt >> /etc/yum.conf \
     && useradd -ms /bin/bash vivado \
     && chown -R vivado /home/vivado \
     && echo "source /opt/Xilinx/Vivado/${VERSION}/settings64.sh" >> /home/vivado/.bashrc
-USER vivado
-WORKDIR /home/vivado
+
+RUN echo "Setting up the 'opencapi' user ..." \
+    && useradd -ms /bin/bash opencapi \
+    && chown -R opencapi /home/opencapi \
+    && echo "source /opt/Xilinx/Vivado/${VERSION}/settings64.sh" >> /home/opencapi/.bashrc
 
 ENV DISPLAY :0
 ENV GEOMETRY 1920x1200
 ENV VERSION=${VERSION}
 
-ENTRYPOINT /opt/Xilinx/Vivado/${VERSION}/bin/vivado
+#ENTRYPOINT /opt/Xilinx/Vivado/${VERSION}/bin/vivado
+
+RUN mkdir /work && chmod -R 777 /work && chown -R opencapi /work
+
+# Install additional dependencies
+RUN yum -y install git ncurses-devel xterm which
+
+# Install a recent CMake
+RUN mkdir /work/cmake && cd /work/cmake \
+    && wget https://github.com/Kitware/CMake/releases/download/v3.20.5/cmake-3.20.5-linux-x86_64.tar.gz \
+    && tar -xzf cmake-3.20.5-linux-x86_64.tar.gz \
+    && cp -r cmake-3.20.5-linux-x86_64/* /usr/local/
+
+RUN yum -y install python3-pip python3-devel
+RUN pip3 install -U pip wheel
+
+# Install Apache Arrow
+RUN yum install -y epel-release || sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm \
+    && yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)/apache-arrow-release-latest.rpm \
+    && yum install -y --enablerepo=epel arrow-devel-3.0.0
+
+# Install Apache Arrow from source
+#RUN mkdir -p /work/arrow && cd /work/arrow && \
+#git clone https://github.com/apache/arrow.git && \
+#cd arrow && \
+#git checkout apache-arrow-4.0.1 && \
+#cd /work/arrow && mkdir build && cd build && \
+#CFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" LDFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0"  cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON ../arrow/cpp && \
+#make -j4 && make install
+
+
+RUN pip3 install pyarrow vhdeps vhdmmio
+
+USER opencapi
+WORKDIR /work
+
+# Install oc-accel and ocse
+RUN mkdir -p /work/OpenCAPI/ && cd /work/OpenCAPI \
+    && git clone https://github.com/OpenCAPI/oc-accel \
+    && pushd oc-accel && git submodule init && git submodule update && popd \
+    && git clone https://github.com/OpenCAPI/ocse \
+    && source /opt/Xilinx/Vivado/${VERSION}/settings64.sh \
+    && cd ocse && make
+
+   
+COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
+COPY files/*sim.sh /work/scripts/
+COPY files/snap_interactive_config_values.txt /work/scripts/
+USER root
+RUN chmod -R +x /work/scripts
+USER opencapi
+
+# Install fletcher for the oc-accel platform
+RUN cd /work/OpenCAPI \
+    && git clone https://github.com/abs-tudelft/fletcher-oc-accel \
+    && pushd fletcher-oc-accel && git submodule init && git submodule update && popd \
+    && pushd fletcher-oc-accel/fletcher && git submodule init && git submodule update && popd
+
+
+# Install Fletcher and fletchgen
+#RUN cd /work/ \
+#    && wget https://github.com/abs-tudelft/fletcher/releases/download/0.0.19/fletcher-0.0.19-1.el7.x86_64.rpm \
+#    && rpm -i fletcher-0.0.19-1.el7.x86_64.rpm \
+#    && rm fletcher-0.0.19-1.el7.x86_64.rpm
+
+# Install Fletcher and fletchgen from source
+USER root
+RUN yum -y install centos-release-scl
+RUN yum -y install devtoolset-9
+user opencapi
+RUN mkdir /work/OpenCAPI/fletcher-oc-accel/fletcher/build \
+    && cd /work/OpenCAPI/fletcher-oc-accel/fletcher/build \
+    && scl enable devtoolset-9 'bash -c "cmake -DFLETCHER_BUILD_FLETCHGEN=On .."' \
+    && scl enable devtoolset-9 'bash -c "make -C /work/OpenCAPI/fletcher-oc-accel/fletcher/build"'
+USER root
+RUN make -C /work/OpenCAPI/fletcher-oc-accel/fletcher/build install
+USER opencapi
+
+#USER root
+#RUN cd /work \
+#    && wget https://github.com/abs-tudelft/fletcher/releases/download/0.0.19/pyfletchgen-0.0.19-cp36-cp36m-manylinux2014_x86_64.whl \
+#    && pip install pyfletchgen-0.0.19-cp36-cp36m-manylinux2014_x86_64.whl --prefix /usr/local
+#USER opencapi
+
+# Prepare oc-accel configuration
+#RUN cd /work/OpenCAPI/oc-accel \
+#    && source /opt/Xilinx/Vivado/2019.2/settings64.sh \
+#    && source /work/OpenCAPI/oc-accel/snap_path.sh \
+#    && cat /work/scripts/snap_interactive_config_values.txt | make config \
+#    && make model
+
+
+CMD /work/scripts/ocxl_run_sim.sh
+
+
+
