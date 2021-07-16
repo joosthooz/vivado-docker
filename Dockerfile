@@ -134,9 +134,14 @@ ENV VERSION=${VERSION}
 #ENTRYPOINT /opt/Xilinx/Vivado/${VERSION}/bin/vivado
 
 RUN mkdir /work && chmod -R 777 /work && chown -R opencapi /work
+RUN chpasswd opencapi:opencapi
+RUN chpasswd vivado:vivado
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Install additional dependencies
-RUN yum -y install git ncurses-devel xterm which
+RUN yum -y install git ncurses-devel xterm which centos-release-scl devtoolset-9 gdb sudo python3-pip python3-devel
+RUN pip3 install -U pip wheel 
+RUN pip3 install numpy pyarrow vhdeps vhdmmio
 
 # Install a recent CMake
 RUN mkdir /work/cmake && cd /work/cmake \
@@ -144,39 +149,61 @@ RUN mkdir /work/cmake && cd /work/cmake \
     && tar -xzf cmake-3.20.5-linux-x86_64.tar.gz \
     && cp -r cmake-3.20.5-linux-x86_64/* /usr/local/
 
-RUN yum -y install python3-pip python3-devel
-RUN pip3 install -U pip wheel
+# Install Apache Arrow binary release #unfortunately we need to build Arrow from source using devtoolset-9 to fix errors on centos 7
+#RUN yum install -y epel-release || sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm \
+#    && yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)/apache-arrow-release-latest.rpm \
+#    && yum install -y --enablerepo=epel arrow-devel
 
-# Install Apache Arrow
-RUN yum install -y epel-release || sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm \
-    && yum install -y https://apache.jfrog.io/artifactory/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)/apache-arrow-release-latest.rpm \
-    && yum install -y --enablerepo=epel arrow-devel-3.0.0
+#install this dependency again (no idea why this is needed)
+RUN yum -y install centos-release-scl devtoolset-9
 
 # Install Apache Arrow from source
-#RUN mkdir -p /work/arrow && cd /work/arrow && \
-#git clone https://github.com/apache/arrow.git && \
-#cd arrow && \
-#git checkout apache-arrow-4.0.1 && \
-#cd /work/arrow && mkdir build && cd build && \
-#CFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" LDFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0"  cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON ../arrow/cpp && \
-#make -j4 && make install
+RUN mkdir -p /work/arrow && cd /work/arrow && \
+git clone https://github.com/apache/arrow.git && \
+cd arrow && \
+git checkout apache-arrow-4.0.1 && \
+cd /work/arrow && mkdir build && cd build && \
+scl enable devtoolset-9 'bash -c "CFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 CXXFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 LDFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0  cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON ../arrow/cpp"' && \
+scl enable devtoolset-9 'bash -c "make -j4 && make install"' && \
+cd /work/arrow && mkdir build_dbg && cd build_dbg && \
+scl enable devtoolset-9 'bash -c "CFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 CXXFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 LDFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON -DCMAKE_BUILD_TYPE=Debug ../arrow/cpp"' && \
+scl enable devtoolset-9 'bash -c "make -j4"'
+RUN echo "/usr/local/lib64" >> /etc/ld.so.conf
+RUN ldconfig
 
+# Install Fletcher and fletchgen from binary release (RPM)
+#RUN cd /work/ \
+#    && wget https://github.com/abs-tudelft/fletcher/releases/download/0.0.19/fletcher-0.0.19-1.el7.x86_64.rpm \
+#    && rpm -i fletcher-0.0.19-1.el7.x86_64.rpm \
+#    && rm fletcher-0.0.19-1.el7.x86_64.rpm
 
-RUN pip3 install pyarrow vhdeps vhdmmio
+# Install Fletcher and fletchgen from binary release (wheels)
+#RUN cd /work \
+#    && wget https://github.com/abs-tudelft/fletcher/releases/download/0.0.19/pyfletchgen-0.0.19-cp36-cp36m-manylinux2014_x86_64.whl \
+#    && pip install pyfletchgen-0.0.19-cp36-cp36m-manylinux2014_x86_64.whl --prefix /usr/local
+
+#unfortunately we need to use a modified vhdmmio to fix errors on centos 7. We need centos 7 (and not 8) because it is officially supported by Vivado 2019.2.
+# Install vhdmmio from source
+RUN mkdir /work/vhdmmio && cd /work/vhdmmio \
+    && git clone https://github.com/joosthooz/vhdmmio \
+    && cd vhdmmio && git checkout force_utf8 \
+    && pip install -e ./
 
 USER opencapi
 WORKDIR /work
+RUN mkdir -p /work/OpenCAPI/
 
-# Install oc-accel and ocse
-RUN mkdir -p /work/OpenCAPI/ && cd /work/OpenCAPI \
-    && git clone https://github.com/OpenCAPI/oc-accel \
-    && pushd oc-accel && git submodule init && git submodule update && popd \
-    && git clone https://github.com/OpenCAPI/ocse \
-    && source /opt/Xilinx/Vivado/${VERSION}/settings64.sh \
-    && cd ocse && make
+# Install Fletcher and fletchgen from source
+RUN cd /work && git clone https://github.com/mbrobbel/fletcher \
+    && cd fletcher && git checkout arrow-4 \
+    && mkdir /work/fletcher/build \
+    && cd /work/fletcher/build \
+    && scl enable devtoolset-9 'bash -c "cmake -DFLETCHER_BUILD_FLETCHGEN=On .."' \
+    && scl enable devtoolset-9 'bash -c "make -j4"'
+USER root
+RUN scl enable devtoolset-9 'bash -c "make -C /work/fletcher/build install"'
+USER opencapi
 
-   
-COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
 COPY files/*sim.sh /work/scripts/
 COPY files/snap_interactive_config_values.txt /work/scripts/
 USER root
@@ -189,37 +216,22 @@ RUN cd /work/OpenCAPI \
     && pushd fletcher-oc-accel && git submodule init && git submodule update && popd \
     && pushd fletcher-oc-accel/fletcher && git submodule init && git submodule update && popd
 
+# Install oc-accel and ocse
+RUN mkdir -p /work/OpenCAPI/ && cd /work/OpenCAPI \
+    && git clone https://github.com/OpenCAPI/oc-accel \
+    && pushd oc-accel && git submodule init && git submodule update && popd \
+    && git clone https://github.com/OpenCAPI/ocse \
+    && source /opt/Xilinx/Vivado/${VERSION}/settings64.sh \
+    && cd ocse && make
+COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
 
-# Install Fletcher and fletchgen
-#RUN cd /work/ \
-#    && wget https://github.com/abs-tudelft/fletcher/releases/download/0.0.19/fletcher-0.0.19-1.el7.x86_64.rpm \
-#    && rpm -i fletcher-0.0.19-1.el7.x86_64.rpm \
-#    && rm fletcher-0.0.19-1.el7.x86_64.rpm
-
-# Install Fletcher and fletchgen from source
-USER root
-RUN yum -y install centos-release-scl
-RUN yum -y install devtoolset-9
-user opencapi
-RUN mkdir /work/OpenCAPI/fletcher-oc-accel/fletcher/build \
-    && cd /work/OpenCAPI/fletcher-oc-accel/fletcher/build \
-    && scl enable devtoolset-9 'bash -c "cmake -DFLETCHER_BUILD_FLETCHGEN=On .."' \
-    && scl enable devtoolset-9 'bash -c "make -C /work/OpenCAPI/fletcher-oc-accel/fletcher/build"'
-USER root
-RUN make -C /work/OpenCAPI/fletcher-oc-accel/fletcher/build install
-USER opencapi
-
-#USER root
-#RUN cd /work \
-#    && wget https://github.com/abs-tudelft/fletcher/releases/download/0.0.19/pyfletchgen-0.0.19-cp36-cp36m-manylinux2014_x86_64.whl \
-#    && pip install pyfletchgen-0.0.19-cp36-cp36m-manylinux2014_x86_64.whl --prefix /usr/local
-#USER opencapi
 
 # Prepare oc-accel configuration
-#RUN cd /work/OpenCAPI/oc-accel \
-#    && source /opt/Xilinx/Vivado/2019.2/settings64.sh \
-#    && source /work/OpenCAPI/oc-accel/snap_path.sh \
-#    && cat /work/scripts/snap_interactive_config_values.txt | make config \
+RUN cd /work/OpenCAPI/oc-accel \
+    && source /opt/Xilinx/Vivado/2019.2/settings64.sh \
+    && source /work/OpenCAPI/oc-accel/snap_path.sh \
+    && cat /work/scripts/snap_interactive_config_values.txt | make config \
+    && cp .snap_config defconfig/9V3.customaction.defconfig
 #    && make model
 
 
