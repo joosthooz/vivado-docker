@@ -215,7 +215,7 @@ RUN mkdir -p /work/OpenCAPI/ && cd /work/OpenCAPI \
 # Install fletcher for the oc-accel platform
 RUN cd /work/OpenCAPI \
     && git clone https://github.com/abs-tudelft/fletcher-oc-accel \
-    && pushd fletcher-oc-accel && git submodule init && git submodule update && popd \
+    && pushd fletcher-oc-accel && git checkout merge_ocxl_updates && git submodule init && git submodule update && popd \
     && pushd fletcher-oc-accel/fletcher && git submodule init && git submodule update && popd
 
 COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
