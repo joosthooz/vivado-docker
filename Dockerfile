@@ -226,12 +226,13 @@ RUN chmod -R +x /work/scripts
 USER opencapi
 
 # Prepare oc-accel configuration
+# TODO: convert this into a COPY defconfig file and make -s defconfig_file
 RUN cd /work/OpenCAPI/oc-accel \
     && source /opt/Xilinx/Vivado/2019.2/settings64.sh \
     && source /work/OpenCAPI/oc-accel/snap_path.sh \
     && cat /work/scripts/snap_interactive_config_values.txt | make config \
-    && cp .snap_config defconfig/9V3.customaction.defconfig
-#    && make model
+    && cp .snap_config defconfig/9V3.customaction.defconfig \
+    && make model
 
 CMD /work/scripts/ocxl_run_sim.sh
 
