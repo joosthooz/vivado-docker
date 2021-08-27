@@ -139,7 +139,7 @@ RUN chpasswd vivado:vivado
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Install additional dependencies
-RUN yum -y install git ncurses-devel xterm which centos-release-scl devtoolset-9 gdb sudo python3-pip python3-devel
+RUN yum -y install git ncurses-devel xterm which centos-release-scl devtoolset-9 gdb sudo python3-pip python3-devel patch
 RUN pip3 install -U pip wheel 
 RUN pip3 install numpy pyarrow vhdeps vhdmmio
 
