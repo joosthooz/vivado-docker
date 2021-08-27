@@ -2,21 +2,36 @@
 This dockerfile currently downloads and installs Vivado from a publically accessible CERN server.
 
 ## Build Instructions
-Building: into the dir and run 'docker build . -t ocxl' (where ocxl is the tag, use any name you like)
+```bash
+docker build . -t ocxl
+```
+(where ocxl is the tag, use any name you like)
 
 ## Run Using X11
-Running: first run ‘xhost +’, then 
 ```bash
+xhost + #to enable the docker container to open a forwarded X window op your host
 docker run -ti --net host -e XAUTHORITY=$HOME/.Xauthority -e DISPLAY=$DISPLAY -v $HOME/.Xauthority:$HOME/.Xauthority -v /tmp/.X11-unix/:/tmp/.X11-unix -h $HOSTNAME ocxl
 ```
 (The complicated run command is to enable X11 forwarding support, so that the simulated oc-accel terminal will pop up)
 
-### Alternate Entrypoint
-By default, docker will execute the entrypoint command which will start an OpenCAPI simulation window.
-To override the entrypoint, you need to use the ```--entrypoint``` option. You may want to do this, for instance, if you want to open a bash terminal instead.
+An xterm window will pop up. in that terminal, execute
 ```bash
-docker run --rm -it -e DISPLAY=$IP:0 -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint /bin/bash <container name>:<container tag>
+/work/OpenCAPI/fletcher-oc-accel/examples/stringwrite/sw/snap_stringwrite
 ```
+To run the application. After it finishes, close the xterm window and press ctrl-c in the original bash terminal to stop the oc-accel HW/SW cosimulation.
+After this, you can view the simulation's waveforms by running `./d
+
+### Alternate Run command
+By default, docker will start an OpenCAPI simulation window of the design configured in `files/snap_env.sh`.
+If you just want to open a bash terminal instead, 
+```bash
+docker run -ti --net host -e XAUTHORITY=$HOME/.Xauthority -e DISPLAY=$DISPLAY -v $HOME/.Xauthority:$HOME/.Xauthority -v /tmp/.X11-unix/:/tmp/.X11-unix -h $HOSTNAME ocxl bash
+```
+If you don't want to forward any GUI windows, you could even just run 
+```bash
+docker run -ti ocxl bash
+Keep in mind that normally, any changes you make will be lost when you close the bash session.
+If you want to make changes permanently, you need to attach a volume or mount a directory on your host and perform your work there.
 
 ## Command Line Access to a Currently Running Container
 If you need to access the command line for a container which is currently running you can use the following command to open up a bash prompt:
