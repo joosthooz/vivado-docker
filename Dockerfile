@@ -204,18 +204,6 @@ USER root
 RUN scl enable devtoolset-9 'bash -c "make -C /work/fletcher/build install"'
 USER opencapi
 
-COPY files/*sim.sh /work/scripts/
-COPY files/snap_interactive_config_values.txt /work/scripts/
-USER root
-RUN chmod -R +x /work/scripts
-USER opencapi
-
-# Install fletcher for the oc-accel platform
-RUN cd /work/OpenCAPI \
-    && git clone https://github.com/abs-tudelft/fletcher-oc-accel \
-    && pushd fletcher-oc-accel && git submodule init && git submodule update && popd \
-    && pushd fletcher-oc-accel/fletcher && git submodule init && git submodule update && popd
-
 # Install oc-accel and ocse
 RUN mkdir -p /work/OpenCAPI/ && cd /work/OpenCAPI \
     && git clone https://github.com/OpenCAPI/oc-accel \
@@ -223,8 +211,19 @@ RUN mkdir -p /work/OpenCAPI/ && cd /work/OpenCAPI \
     && git clone https://github.com/OpenCAPI/ocse \
     && source /opt/Xilinx/Vivado/${VERSION}/settings64.sh \
     && cd ocse && make
-COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
 
+# Install fletcher for the oc-accel platform
+RUN cd /work/OpenCAPI \
+    && git clone https://github.com/abs-tudelft/fletcher-oc-accel \
+    && pushd fletcher-oc-accel && git submodule init && git submodule update && popd \
+    && pushd fletcher-oc-accel/fletcher && git submodule init && git submodule update && popd
+
+COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
+COPY files/*sim.sh /work/scripts/
+COPY files/snap_interactive_config_values.txt /work/scripts/
+USER root
+RUN chmod -R +x /work/scripts
+USER opencapi
 
 # Prepare oc-accel configuration
 RUN cd /work/OpenCAPI/oc-accel \
@@ -233,7 +232,6 @@ RUN cd /work/OpenCAPI/oc-accel \
     && cat /work/scripts/snap_interactive_config_values.txt | make config \
     && cp .snap_config defconfig/9V3.customaction.defconfig
 #    && make model
-
 
 CMD /work/scripts/ocxl_run_sim.sh
 
