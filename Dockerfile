@@ -161,15 +161,17 @@ RUN yum -y install centos-release-scl devtoolset-9
 RUN mkdir -p /work/arrow && cd /work/arrow && \
 git clone https://github.com/apache/arrow.git && \
 cd arrow && \
-git checkout apache-arrow-4.0.1 && \
+git checkout apache-arrow-5.0.0 && \
 cd /work/arrow && mkdir build && cd build && \
 scl enable devtoolset-9 'bash -c "CFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 CXXFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 LDFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0  cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON ../arrow/cpp"' && \
-scl enable devtoolset-9 'bash -c "make -j4 && make install"' && \
-cd /work/arrow && mkdir build_dbg && cd build_dbg && \
-scl enable devtoolset-9 'bash -c "CFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 CXXFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 LDFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON -DCMAKE_BUILD_TYPE=Debug ../arrow/cpp"' && \
-scl enable devtoolset-9 'bash -c "make -j4"'
+scl enable devtoolset-9 'bash -c "make -j4 && make install"'
 RUN echo "/usr/local/lib64" >> /etc/ld.so.conf
 RUN ldconfig
+
+# Perform debug build of Apache Arrow
+#RUN cd /work/arrow && mkdir build_dbg && cd build_dbg && \
+#scl enable devtoolset-9 'bash -c "CFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 CXXFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 LDFLAGS=-D_GLIBCXX_USE_CXX11_ABI=0 cmake -DARROW_PYTHON=ON -DARROW_DATASET=ON -DARROW_PARQUET=ON -DARROW_WITH_SNAPPY=ON -DCMAKE_BUILD_TYPE=Debug ../arrow/cpp"' && \
+#scl enable devtoolset-9 'bash -c "make -j4"'
 
 # Install Fletcher and fletchgen from binary release (RPM)
 #RUN cd /work/ \
@@ -194,8 +196,8 @@ WORKDIR /work
 RUN mkdir -p /work/OpenCAPI/
 
 # Install Fletcher and fletchgen from source
-RUN cd /work && git clone https://github.com/mbrobbel/fletcher \
-    && cd fletcher && git checkout arrow-4 \
+RUN cd /work && git clone https://github.com/abs-tudelft/fletcher \
+    && cd fletcher \
     && mkdir /work/fletcher/build \
     && cd /work/fletcher/build \
     && scl enable devtoolset-9 'bash -c "cmake -DFLETCHER_BUILD_FLETCHGEN=On .."' \
