@@ -19,7 +19,7 @@ An xterm window will pop up. in that terminal, execute
 /work/OpenCAPI/fletcher-oc-accel/examples/stringwrite/sw/snap_stringwrite
 ```
 To run the application. After it finishes, close the xterm window and press ctrl-c in the original bash terminal to stop the oc-accel HW/SW cosimulation.
-After this, you can view the simulation's waveforms by running `./d
+After this, you can view the simulation's waveforms by running `./display_traces`
 
 ### Alternate Run command
 By default, docker will start an OpenCAPI simulation window of the design configured in `files/snap_env.sh`.
