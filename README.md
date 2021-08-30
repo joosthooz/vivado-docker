@@ -40,3 +40,6 @@ docker exec -it <container name> bash
 ```
 
 You may need to run ```docker ps -a``` to find the name of the container if you didn't set one yourself. Docker will set it's own name if you didn't specify one.
+
+## Synthesizing a bitstream
+If you would want to synthesize a bitstream in the docker container, you need to provide a license file, copy it into the container, and point vivado to it in `files/snap_env.sh`.
