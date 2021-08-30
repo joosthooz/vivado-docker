@@ -222,18 +222,20 @@ RUN cd /work/OpenCAPI \
 
 COPY files/snap_env.sh /work/OpenCAPI/oc-accel/
 COPY files/*sim.sh /work/scripts/
-COPY files/snap_interactive_config_values.txt /work/scripts/
+COPY files/customaction.defconfig /work/OpenCAPI/oc-accel/defconfig/
 USER root
 RUN chmod -R +x /work/scripts
 USER opencapi
 
+# We're now using defconfig files to configure oc-accel, otherwise you can use an answerfile and pipe it into the menuconfig like this:
+# COPY files/snap_interactive_config_values.txt /work/scripts/
+# ... && cat /work/scripts/snap_interactive_config_values.txt | make config \
+#    && cp .snap_config defconfig/9V3.customaction.defconfig \
+
 # Prepare oc-accel configuration
-# TODO: convert this into a COPY defconfig file and make -s defconfig_file
 RUN cd /work/OpenCAPI/oc-accel \
     && source /opt/Xilinx/Vivado/2019.2/settings64.sh \
-    && source /work/OpenCAPI/oc-accel/snap_path.sh \
-    && cat /work/scripts/snap_interactive_config_values.txt | make config \
-    && cp .snap_config defconfig/9V3.customaction.defconfig \
+    && make -s customaction.defconfig \
     && make model
 
 CMD /work/scripts/ocxl_run_sim.sh
