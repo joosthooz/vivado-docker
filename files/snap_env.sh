@@ -1,6 +1,4 @@
 export ACTION_ROOT=/work/OpenCAPI/fletcher-oc-accel/examples/stringwrite
-export FLETCHER_DIR=/work/OpenCAPI/fletcher-oc-accel/fletcher
-export VHLIB_DIR=${FLETCHER_DIR}/hardware/vhlib
 export TIMING_LABLIMIT="-200"
 export ILA_SETUP_FILE=
 export OCSE_ROOT=/work/OpenCAPI/ocse
